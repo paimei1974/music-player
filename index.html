@@ -7,44 +7,79 @@
 
   <style>
     body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
-    .card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:680px;margin:0 auto;}
+    .card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:760px;margin:0 auto;}
     input[type=range]{width:100%;}
     button{padding:10px 16px;margin:6px;font-size:15px;}
     .big{font-size:18px;font-weight:bold;}
     .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
-    .hint{font-size:12px;color:#555;line-height:1.5;text-align:left;margin:10px auto 0;max-width:620px;}
-    .kbd{display:inline-block;border:1px solid #ccc;border-bottom-width:2px;border-radius:6px;padding:2px 8px;margin:2px 3px;background:#fafafa;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:12px;}
+    .hint{font-size:12px;color:#555;line-height:1.5;text-align:left;margin:10px auto 0;max-width:700px;}
     .sep{height:1px;background:#eee;margin:14px 0;}
     .status{font-size:13px;color:#333;margin-top:6px;}
-    .muted{color:#666;}
     .danger{color:#b00020;}
+    .pill{display:inline-block;padding:2px 10px;border:1px solid #ddd;border-radius:999px;font-size:12px;background:#fafafa;}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px;max-width:700px;margin:0 auto;}
+    @media(min-width:700px){
+      .grid{grid-template-columns:1fr 1fr;}
+    }
   </style>
+
+  <!-- SoundTouchJS（ピッチシフト） -->
+  <script src="https://unpkg.com/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
 </head>
 
 <body>
   <div class="card">
-    <h2>🎸 練習用プレイヤー（キー完全版）</h2>
+    <h2>🎸 練習用プレイヤー（キー上下対応）</h2>
 
     <div class="row">
       <input type="file" id="fileInput" accept="audio/*" />
       <button id="loadBtn">読み込み</button>
-      <button id="helpBtn" title="ショートカット表示切替">キー一覧</button>
+      <button id="playBtn">再生</button>
+      <button id="pauseBtn">停止</button>
     </div>
 
     <div class="hint">
-      <div class="muted">
-        ※ iPhoneは「読み込み」を押してから再生すると安定します。<br>
-        ※ iPhoneのホーム画面追加(PWA)だとファイル選択が動かない場合があります。その時はSafariで開いて試してください。
+      <div>
+        <span class="pill">iPhone Safari対策</span>
+        「読み込み」→「再生」の順で押すと安定します。<br>
+        ※ ホーム画面追加(PWA)だとファイル選択が動かない場合があります。その時はSafariで開いて試してください。
       </div>
     </div>
 
-    <audio id="audio" controls playsinline></audio>
+    <div class="sep"></div>
+
+    <div class="row">
+      <button id="back10">◀ 10秒</button>
+      <button id="back5">◀ 5秒</button>
+      <button id="fwd5">5秒 ▶</button>
+      <button id="fwd10">10秒 ▶</button>
+    </div>
+
+    <div class="row" style="max-width:700px;margin:0 auto;">
+      <input type="range" id="seek" min="0" max="1000" value="0" />
+    </div>
+    <div class="status" id="timeLabel">00:00 / 00:00</div>
 
     <div class="sep"></div>
 
-    <h3>再生速度（ピッチ維持）</h3>
-    <input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1" />
-    <p class="big" id="speedValue">1.00x</p>
+    <div class="grid">
+      <div>
+        <h3>テンポ（速度）</h3>
+        <input type="range" id="tempo" min="0.5" max="1.5" step="0.01" value="1" />
+        <p class="big" id="tempoValue">1.00x</p>
+      </div>
+
+      <div>
+        <h3>キー（音程：半音）</h3>
+        <input type="range" id="pitch" min="-12" max="12" step="1" value="0" />
+        <p class="big" id="pitchValue">±0</p>
+        <div class="row">
+          <button id="pitchDown">-1</button>
+          <button id="pitchZero">0</button>
+          <button id="pitchUp">+1</button>
+        </div>
+      </div>
+    </div>
 
     <div class="sep"></div>
 
@@ -56,44 +91,26 @@
       <button id="clearLoopBtn">解除</button>
     </div>
     <p class="status" id="loopStatus">未設定</p>
-
-    <div class="sep"></div>
-
-    <h3>スキップ</h3>
-    <div class="row">
-      <button id="back10">◀ 10秒</button>
-      <button id="back5">◀ 5秒</button>
-      <button id="fwd5">5秒 ▶</button>
-      <button id="fwd10">10秒 ▶</button>
-    </div>
-
-    <div class="sep"></div>
-
-    <div id="help" class="hint" style="display:none;">
-      <b>⌨️ キー操作（完全版）</b><br>
-      <span class="kbd">Space</span> 再生/停止　
-      <span class="kbd">←</span>/<span class="kbd">→</span> 5秒戻る/進む　
-      <span class="kbd">Shift</span>+<span class="kbd">←</span>/<span class="kbd">→</span> 10秒戻る/進む<br>
-      <span class="kbd">A</span> A設定　
-      <span class="kbd">B</span> B設定　
-      <span class="kbd">L</span> ループON/OFF　
-      <span class="kbd">C</span> ループ解除<br>
-      <span class="kbd">+</span>/<span class="kbd">-</span> 速度 +0.05 / -0.05　
-      <span class="kbd">0</span> 速度1.00に戻す　
-      <span class="kbd">H</span> キー一覧の表示切替
-      <div class="muted" style="margin-top:6px;">
-        ※ 入力欄（ファイル選択等）にフォーカスがあるときはキー操作を抑制します。
-      </div>
-    </div>
   </div>
 
   <script>
-    const audio = document.getElementById('audio');
+    // ========= UI =========
     const fileInput = document.getElementById('fileInput');
     const loadBtn = document.getElementById('loadBtn');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
 
-    const speed = document.getElementById('speed');
-    const speedValue = document.getElementById('speedValue');
+    const seek = document.getElementById('seek');
+    const timeLabel = document.getElementById('timeLabel');
+
+    const tempo = document.getElementById('tempo');
+    const tempoValue = document.getElementById('tempoValue');
+
+    const pitch = document.getElementById('pitch');
+    const pitchValue = document.getElementById('pitchValue');
+    const pitchDown = document.getElementById('pitchDown');
+    const pitchUp = document.getElementById('pitchUp');
+    const pitchZero = document.getElementById('pitchZero');
 
     const loopStatus = document.getElementById('loopStatus');
     const setABtn = document.getElementById('setABtn');
@@ -106,28 +123,45 @@
     const fwd5 = document.getElementById('fwd5');
     const fwd10 = document.getElementById('fwd10');
 
-    const help = document.getElementById('help');
-    const helpBtn = document.getElementById('helpBtn');
+    // ========= Audio / SoundTouch =========
+    let ctx = null;
+    let buffer = null;            // AudioBuffer
+    let st = null;                // SoundTouch instance
+    let filter = null;            // SimpleFilter
+    let node = null;              // ScriptProcessorNode
 
-    let A = null;
-    let B = null;
+    let isPlaying = false;
+    let startWallTime = 0;        // 再生開始時刻（ctx.currentTime）
+    let startSamplePos = 0;       // 再生開始時のサンプル位置（元音源基準）
+    let samplePos = 0;            // 現在サンプル位置（元音源基準）
+    let durationSec = 0;
+    let rafId = null;
+
+    // AB loop
+    let A = null; // sec
+    let B = null; // sec
     let loopEnabled = true;
-    let blobUrl = null;
 
-    function clampTime(t) {
-      const d = Number.isFinite(audio.duration) ? audio.duration : 0;
-      if (!d) return Math.max(0, t);
-      return Math.min(Math.max(0, t), Math.max(0, d - 0.01));
+    // ScriptProcessor バッファサイズ（小さすぎると負荷/途切れ、大きすぎると遅延）
+    const PROCESSOR_SIZE = 2048;
+
+    function ensureContext() {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
-    function setPreservePitch() {
-      // ブラウザ差異吸収（対応してない環境でも落ちない）
-      try { audio.preservesPitch = true; } catch(e) {}
-      try { audio.webkitPreservesPitch = true; } catch(e) {}
+    function formatTime(sec) {
+      if (!Number.isFinite(sec) || sec < 0) sec = 0;
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
     }
 
-    function updateSpeedUI() {
-      speedValue.innerText = Number(speed.value).toFixed(2) + 'x';
+    function updateTempoUI() {
+      tempoValue.textContent = Number(tempo.value).toFixed(2) + 'x';
+    }
+    function updatePitchUI() {
+      const v = Number(pitch.value);
+      pitchValue.textContent = (v === 0) ? '±0' : (v > 0 ? `+${v}` : `${v}`);
     }
 
     function updateLoopStatus() {
@@ -145,182 +179,251 @@
       if (A !== null && B !== null && B <= A) loopStatus.classList.add('danger');
     }
 
-    function loadSelectedFile() {
+    function secToSample(sec) {
+      if (!buffer) return 0;
+      return Math.max(0, Math.min(buffer.length, Math.floor(sec * buffer.sampleRate)));
+    }
+    function sampleToSec(sample) {
+      if (!buffer) return 0;
+      return sample / buffer.sampleRate;
+    }
+
+    function stopEngine() {
+      isPlaying = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+
+      if (node) {
+        try { node.disconnect(); } catch(e) {}
+        node.onaudioprocess = null;
+        node = null;
+      }
+      filter = null;
+    }
+
+    function rebuildEngineFrom(sampleStart) {
+      // SoundTouch のソースは “元バッファ” を読む
+      const source = new window.soundtouch.BufferSource(buffer);
+      source._position = sampleStart; // 内部位置（実装依存だけど SoundTouchJS はこれで動くことが多い）
+
+      st = new window.soundtouch.SoundTouch(buffer.sampleRate);
+      st.tempo = Number(tempo.value);                // テンポ（速度）
+      st.pitchSemitones = Number(pitch.value);       // ピッチ（半音）
+
+      filter = new window.soundtouch.SimpleFilter(source, st);
+
+      node = ctx.createScriptProcessor(PROCESSOR_SIZE, 2, 2);
+      node.onaudioprocess = (e) => {
+        const outL = e.outputBuffer.getChannelData(0);
+        const outR = e.outputBuffer.getChannelData(1);
+
+        // SoundTouch からフレーム取得
+        const frames = filter.extract(outL, outL.length);
+        if (frames === 0) {
+          // 終端
+          stopEngine();
+          return;
+        }
+        // outR にもコピー（ステレオ素材は SoundTouchJS 側が対応しきれない場合があるので簡易対応）
+        outR.set(outL);
+
+        // samplePos を“だいたい”進める（テンポ変化があるので厳密ではないがUI用途なら十分）
+        samplePos = source._position || samplePos + frames;
+
+        // ABループ（secで判定→サンプルに戻す）
+        if (loopEnabled && A !== null && B !== null && B > A) {
+          const curSec = sampleToSec(samplePos);
+          if (curSec >= B) {
+            const aS = secToSample(A);
+            source._position = aS;
+            samplePos = aS;
+          }
+        }
+      };
+
+      node.connect(ctx.destination);
+    }
+
+    async function loadSelectedFile() {
       const f = fileInput.files && fileInput.files[0];
       if (!f) {
         alert('音源ファイルを選んでください');
         return;
       }
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-      blobUrl = URL.createObjectURL(f);
-      audio.src = blobUrl;
-      audio.load(); // iOS系で安定
-      setPreservePitch();
 
-      // ループ状態はリセット
+      ensureContext();
+      // iOS Safari: ユーザー操作内で resume すると安定
+      await ctx.resume();
+
+      const arrayBuf = await f.arrayBuffer();
+      buffer = await ctx.decodeAudioData(arrayBuf);
+      durationSec = buffer.duration;
+
+      // 位置リセット
+      stopEngine();
+      samplePos = 0;
+      startSamplePos = 0;
+      startWallTime = 0;
+
+      // ループリセット
       A = null; B = null; loopEnabled = true;
       updateLoopStatus();
+
+      // UI反映
+      seek.value = 0;
+      timeLabel.textContent = `${formatTime(0)} / ${formatTime(durationSec)}`;
+
+      alert('読み込み完了！「再生」を押してください');
     }
 
-    function togglePlay() {
-      if (!audio.src) {
-        alert('先に音源を読み込んでください');
+    async function playFromCurrent() {
+      if (!buffer) {
+        alert('先に「読み込み」を押して音源を読み込んでください');
         return;
       }
-      if (audio.paused) audio.play();
-      else audio.pause();
+      ensureContext();
+      await ctx.resume();
+
+      // すでに再生中なら何もしない
+      if (isPlaying) return;
+
+      // エンジン再構築して再生
+      rebuildEngineFrom(samplePos);
+      isPlaying = true;
+      startWallTime = ctx.currentTime;
+      startSamplePos = samplePos;
+
+      tickUI();
+    }
+
+    function pause() {
+      stopEngine();
     }
 
     function skip(sec) {
-      audio.currentTime = clampTime(audio.currentTime + sec);
-    }
+      if (!buffer) return;
+      const cur = sampleToSec(samplePos);
+      let next = cur + sec;
+      next = Math.max(0, Math.min(durationSec, next));
+      samplePos = secToSample(next);
 
-    function setA() {
-      if (!audio.src) { alert('先に音源を読み込んでください'); return; }
-      A = audio.currentTime;
-      // Aを更新したら、BがAより前なら無効化
-      if (B !== null && B <= A) B = null;
-      updateLoopStatus();
-    }
-
-    function setB() {
-      if (!audio.src) { alert('先に音源を読み込んでください'); return; }
-      if (A === null) { alert('先にAを設定してください'); return; }
-      B = audio.currentTime;
-      if (B <= A) {
-        alert('BはAより後ろに設定してください');
-        B = null;
+      // 再生中なら再構築（SoundTouchはシークが弱いので作り直すのが確実）
+      if (isPlaying) {
+        stopEngine();
+        playFromCurrent();
+      } else {
+        // UI更新だけ
+        updateSeekUI();
       }
-      updateLoopStatus();
     }
 
-    function clearLoop() {
-      A = null; B = null;
-      loopEnabled = true;
-      updateLoopStatus();
+    function updateSeekUI() {
+      const curSec = sampleToSec(samplePos);
+      const ratio = durationSec ? (curSec / durationSec) : 0;
+      seek.value = Math.round(ratio * 1000);
+      timeLabel.textContent = `${formatTime(curSec)} / ${formatTime(durationSec)}`;
     }
 
-    function toggleLoop() {
-      loopEnabled = !loopEnabled;
-      updateLoopStatus();
+    function tickUI() {
+      if (!buffer) return;
+
+      // 再生中は “おおよそ” で時間を進める（精密同期は難しい）
+      if (isPlaying) {
+        // テンポを考慮してざっくり進める
+        const elapsed = ctx.currentTime - startWallTime;
+        const approxSec = sampleToSec(startSamplePos) + elapsed * Number(tempo.value);
+        const clamped = Math.min(Math.max(0, approxSec), durationSec);
+        samplePos = secToSample(clamped);
+      }
+
+      updateSeekUI();
+      rafId = requestAnimationFrame(tickUI);
     }
 
-    function setSpeed(v) {
-      const nv = Math.min(1.5, Math.max(0.5, v));
-      speed.value = nv.toFixed(2);
-      audio.playbackRate = Number(speed.value);
-      setPreservePitch();
-      updateSpeedUI();
+    function applyTempoPitchLive() {
+      // 再生中に変えても反映されにくいので、再生中は作り直す
+      if (isPlaying) {
+        stopEngine();
+        playFromCurrent();
+      }
     }
 
-    function nudgeSpeed(delta) {
-      setSpeed(Number(speed.value) + delta);
-    }
-
-    function toggleHelp() {
-      help.style.display = (help.style.display === 'none') ? 'block' : 'none';
-    }
-
-    // UI events
+    // ========= Events =========
     loadBtn.addEventListener('click', loadSelectedFile);
-    fileInput.addEventListener('change', () => {
-      // 変えたら状態だけ更新（読み込みボタン方式が安定）
-      A = null; B = null; loopEnabled = true;
-      updateLoopStatus();
-    });
-
-    speed.addEventListener('input', () => {
-      audio.playbackRate = Number(speed.value);
-      setPreservePitch();
-      updateSpeedUI();
-    });
-
-    setABtn.addEventListener('click', setA);
-    setBBtn.addEventListener('click', setB);
-    clearLoopBtn.addEventListener('click', clearLoop);
-    toggleLoopBtn.addEventListener('click', toggleLoop);
+    playBtn.addEventListener('click', playFromCurrent);
+    pauseBtn.addEventListener('click', pause);
 
     back10.addEventListener('click', () => skip(-10));
     back5.addEventListener('click', () => skip(-5));
     fwd5.addEventListener('click', () => skip(5));
     fwd10.addEventListener('click', () => skip(10));
 
-    helpBtn.addEventListener('click', toggleHelp);
-
-    // AB loop core
-    audio.addEventListener('timeupdate', () => {
-      if (!loopEnabled) return;
-      if (A !== null && B !== null && B > A) {
-        if (audio.currentTime >= B) {
-          audio.currentTime = A;
-        }
+    seek.addEventListener('input', () => {
+      if (!buffer) return;
+      const ratio = Number(seek.value) / 1000;
+      const targetSec = ratio * durationSec;
+      samplePos = secToSample(targetSec);
+      updateSeekUI();
+    });
+    seek.addEventListener('change', () => {
+      // 指を離したら反映（再生中なら再構築）
+      if (isPlaying) {
+        stopEngine();
+        playFromCurrent();
       }
     });
 
-    // Keyboard shortcuts (完全版)
-    document.addEventListener('keydown', (e) => {
-      // 入力中は邪魔しない
-      const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
-      const isTyping = tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable;
-      if (isTyping) return;
-
-      // 修飾キー（Ctrl/Meta/Alt）は基本無視（誤爆防止）
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-      const key = e.key;
-
-      // Space: play/pause
-      if (key === ' ') {
-        e.preventDefault();
-        togglePlay();
-        return;
-      }
-
-      // Help toggle
-      if (key === 'h' || key === 'H') {
-        toggleHelp();
-        return;
-      }
-
-      // Skip
-      if (key === 'ArrowLeft') {
-        e.preventDefault();
-        skip(e.shiftKey ? -10 : -5);
-        return;
-      }
-      if (key === 'ArrowRight') {
-        e.preventDefault();
-        skip(e.shiftKey ? 10 : 5);
-        return;
-      }
-
-      // Loop controls
-      if (key === 'a' || key === 'A') { setA(); return; }
-      if (key === 'b' || key === 'B') { setB(); return; }
-      if (key === 'l' || key === 'L') { toggleLoop(); return; }
-      if (key === 'c' || key === 'C') { clearLoop(); return; }
-
-      // Speed controls
-      if (key === '+' || key === '=') { // US配列で+が=になることがある
-        e.preventDefault();
-        nudgeSpeed(0.05);
-        return;
-      }
-      if (key === '-' || key === '_') {
-        e.preventDefault();
-        nudgeSpeed(-0.05);
-        return;
-      }
-      if (key === '0') {
-        e.preventDefault();
-        setSpeed(1.0);
-        return;
-      }
+    tempo.addEventListener('input', () => {
+      updateTempoUI();
+      applyTempoPitchLive();
     });
 
-    // init
-    setPreservePitch();
-    updateSpeedUI();
+    pitch.addEventListener('input', () => {
+      updatePitchUI();
+      applyTempoPitchLive();
+    });
+
+    pitchDown.addEventListener('click', () => {
+      pitch.value = Math.max(-12, Number(pitch.value) - 1);
+      updatePitchUI();
+      applyTempoPitchLive();
+    });
+    pitchUp.addEventListener('click', () => {
+      pitch.value = Math.min(12, Number(pitch.value) + 1);
+      updatePitchUI();
+      applyTempoPitchLive();
+    });
+    pitchZero.addEventListener('click', () => {
+      pitch.value = 0;
+      updatePitchUI();
+      applyTempoPitchLive();
+    });
+
+    setABtn.addEventListener('click', () => {
+      if (!buffer) return;
+      A = sampleToSec(samplePos);
+      if (B !== null && B <= A) B = null;
+      updateLoopStatus();
+    });
+    setBBtn.addEventListener('click', () => {
+      if (!buffer) return;
+      if (A === null) { alert('先にAを設定してください'); return; }
+      B = sampleToSec(samplePos);
+      if (B <= A) { alert('BはAより後ろに設定してください'); B = null; }
+      updateLoopStatus();
+    });
+    toggleLoopBtn.addEventListener('click', () => {
+      loopEnabled = !loopEnabled;
+      updateLoopStatus();
+    });
+    clearLoopBtn.addEventListener('click', () => {
+      A = null; B = null; loopEnabled = true;
+      updateLoopStatus();
+    });
+
+    // init UI
+    updateTempoUI();
+    updatePitchUI();
     updateLoopStatus();
   </script>
 </body>
