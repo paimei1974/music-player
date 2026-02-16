@@ -2,86 +2,172 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Pitch Player</title>
-  <style>
-    body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
-    .card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:560px;margin:0 auto;}
-    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
-    input[type=range]{width:100%;}
-    button{padding:10px 16px;margin:6px;font-size:15px;}
-    .big{font-size:18px;font-weight:bold;}
-    .hint{font-size:12px;color:#555;line-height:1.4;margin-top:8px;}
-    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Practice Player</title>
 
-  <!-- Tone.js (CDN) -->
-  <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+  <style>
+    :root { --bg:#f5f6fa; --card:#fff; --text:#111; --muted:#555; }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;text-align:center;margin:0;padding:18px;background:var(--bg);color:var(--text);}
+    .card{background:var(--card);padding:18px;border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,0.10);max-width:620px;margin:0 auto;}
+    h2{margin:6px 0 10px;}
+    h3{margin:18px 0 10px;font-size:16px;}
+    .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center;}
+    .row > *{flex:0 0 auto;}
+    input[type="file"]{max-width:100%;}
+    input[type="range"]{width:100%;}
+    button{padding:10px 14px;margin:0;border:0;border-radius:12px;background:#111;color:#fff;font-size:15px;cursor:pointer;}
+    button.secondary{background:#e9eaee;color:#111;}
+    button:disabled{opacity:.5;cursor:not-allowed;}
+    .big{font-size:18px;font-weight:700;margin:8px 0;}
+    .hint{font-size:12px;color:var(--muted);line-height:1.45;margin:10px 0 0;}
+    .status{font-size:13px;color:var(--muted);line-height:1.45;margin:10px 0 0;white-space:pre-line;}
+    .sep{height:1px;background:#ececf1;margin:16px 0;}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#eef0f6;font-size:12px;color:#333;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;}
+  </style>
 </head>
 
 <body>
   <div class="card">
-    <h2>🎸 半音ピッチプレイヤー</h2>
+    <h2>🎸 練習用プレイヤー</h2>
 
     <div class="row">
       <input type="file" id="fileInput" accept="audio/*" />
       <button id="loadBtn">読み込み</button>
-      <button id="playBtn">再生</button>
-      <button id="pauseBtn">停止</button>
     </div>
 
     <p class="hint">
-      ※ iPhoneは <b>「読み込み」→「再生」</b> の順が安定します。<br>
-      ※ 音が二重に聞こえる時は、下の音量を 0 にしています（処理後の音だけ出します）。
+      ※ iPhoneは<strong>「読み込み」→「再生」</strong>の順が一番安定します。<br>
+      ※ ホーム画面追加(PWA)だとファイル選択が動かないことがあります。その場合はSafariで開いてください。
     </p>
 
-    <!-- audio要素は「制御用」（実音はWebAudio側から出す） -->
-    <audio id="audio" controls playsinline class="mono" style="width:100%; margin-top:10px;"></audio>
+    <div class="sep"></div>
 
-    <h3>ピッチ（半音）</h3>
-    <input type="range" id="pitch" min="-12" max="12" step="1" value="0" />
-    <p class="big"><span id="pitchValue">0</span>（半音）</p>
+    <div class="row" style="justify-content:space-between;gap:12px;">
+      <span class="pill">状態: <span id="stateText" class="mono">未読み込み</span></span>
+      <span class="pill">現在: <span id="timeText" class="mono">0.0</span>s</span>
+    </div>
+
+    <audio id="audio" controls playsinline preload="metadata" style="width:100%;margin-top:10px;"></audio>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="playBtn">▶ 再生</button>
+      <button id="pauseBtn" class="secondary">⏸ 一時停止</button>
+      <button id="stopBtn" class="secondary">⏹ 停止</button>
+    </div>
+
+    <h3>再生速度（ピッチ維持）</h3>
+    <input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1" />
+    <p class="big" id="speedValue">1.00x</p>
+
+    <h3>A-Bループ</h3>
+    <div class="row">
+      <button id="setABtn" class="secondary">A設定</button>
+      <button id="setBBtn" class="secondary">B設定</button>
+      <button id="clearLoopBtn" class="secondary">解除</button>
+    </div>
+    <p id="loopStatus" class="mono">未設定</p>
+
+    <h3>10秒戻る / 進む</h3>
+    <div class="row">
+      <button id="back10" class="secondary">◀ 10秒</button>
+      <button id="fwd10" class="secondary">10秒 ▶</button>
+    </div>
+
+    <p id="msg" class="status"></p>
   </div>
 
   <script>
-    const audioEl = document.getElementById('audio');
+    const audio = document.getElementById('audio');
     const fileInput = document.getElementById('fileInput');
     const loadBtn = document.getElementById('loadBtn');
+
     const playBtn = document.getElementById('playBtn');
     const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
 
-    const pitch = document.getElementById('pitch');
-    const pitchValue = document.getElementById('pitchValue');
+    const speed = document.getElementById('speed');
+    const speedValue = document.getElementById('speedValue');
 
+    const setABtn = document.getElementById('setABtn');
+    const setBBtn = document.getElementById('setBBtn');
+    const clearLoopBtn = document.getElementById('clearLoopBtn');
+    const loopStatus = document.getElementById('loopStatus');
+
+    const back10 = document.getElementById('back10');
+    const fwd10 = document.getElementById('fwd10');
+
+    const msg = document.getElementById('msg');
+    const stateText = document.getElementById('stateText');
+    const timeText = document.getElementById('timeText');
+
+    let A = null;
+    let B = null;
     let blobUrl = null;
 
-    // Tone.js nodes
-    let mediaSource = null;
-    let pitchShift = null;
-    let ready = false;
+    // ループ監視（timeupdateが荒い環境の保険）
+    let loopTimer = null;
 
-    async function ensureAudioGraph() {
-      if (ready) return;
+    function log(s) {
+      msg.textContent = s;
+    }
 
-      // iOS対策：ユーザー操作中にAudioContext開始
-      await Tone.start();
+    function setState(s) {
+      stateText.textContent = s;
+    }
 
-      // audio要素 → WebAudio(Tone) へ取り込み
-      mediaSource = Tone.context.createMediaElementSource(audioEl);
+    function setPreservePitch() {
+      // ブラウザ差異吸収
+      try { audio.preservesPitch = true; } catch(e) {}
+      try { audio.webkitPreservesPitch = true; } catch(e) {}
+      try { audio.mozPreservesPitch = true; } catch(e) {}
+    }
 
-      pitchShift = new Tone.PitchShift({
-        pitch: Number(pitch.value), // 半音
-        windowSize: 0.1
-      });
+    function clampTime(t) {
+      if (Number.isNaN(t) || !Number.isFinite(t)) return 0;
+      if (t < 0) return 0;
+      const d = audio.duration;
+      if (Number.isFinite(d) && d > 0 && t > d) return d;
+      return t;
+    }
 
-      // つなぐ：mediaSource -> pitchShift -> destination
-      mediaSource.connect(pitchShift);
-      pitchShift.toDestination();
+    function clearLoop() {
+      A = null; B = null;
+      loopStatus.textContent = '未設定';
+    }
 
-      // 元のaudio出力はミュート（処理後だけ鳴らす）
-      audioEl.volume = 0;
+    function updateLoopStatus() {
+      if (A === null && B === null) {
+        loopStatus.textContent = '未設定';
+        return;
+      }
+      if (A !== null && B === null) {
+        loopStatus.textContent = `A:${A.toFixed(1)} / B:未設定`;
+        return;
+      }
+      loopStatus.textContent = `A:${A.toFixed(1)} / B:${B.toFixed(1)}`;
+    }
 
-      ready = true;
+    function stopLoopTimer() {
+      if (loopTimer) {
+        clearInterval(loopTimer);
+        loopTimer = null;
+      }
+    }
+
+    function startLoopTimer() {
+      stopLoopTimer();
+      loopTimer = setInterval(() => {
+        if (A !== null && B !== null && !audio.paused) {
+          if (audio.currentTime >= B) {
+            audio.currentTime = A;
+          }
+        }
+      }, 60);
+    }
+
+    function hasLoaded() {
+      return !!audio.src;
     }
 
     function loadSelectedFile() {
@@ -90,39 +176,146 @@
         alert('音源ファイルを選んでください');
         return;
       }
+
+      // 既存blob URL解放
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       blobUrl = URL.createObjectURL(f);
-      audioEl.src = blobUrl;
-      audioEl.load();
+
+      // 状態初期化
+      clearLoop();
+      stopLoopTimer();
+
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = blobUrl;
+
+      // iOS対策: load() を明示
+      audio.load();
+
+      setPreservePitch();
+      audio.playbackRate = Number(speed.value);
+
+      setState('読み込み済み（再生ボタンを押してください）');
+      log('読み込み完了。▶ 再生 を押してください。');
     }
 
-    loadBtn.addEventListener('click', async () => {
-      loadSelectedFile();
-      await ensureAudioGraph();
-      // iOSは自動再生がブロックされるので、ここでは再生しない
-    });
-
-    playBtn.addEventListener('click', async () => {
-      await ensureAudioGraph();
-      if (!audioEl.src) {
-        alert('先に「読み込み」でファイルを読み込んでください');
+    async function safePlay() {
+      if (!hasLoaded()) {
+        alert('先に音源を「読み込み」してください');
         return;
       }
-      await audioEl.play();
+      try {
+        setPreservePitch();
+        audio.playbackRate = Number(speed.value);
+
+        // iOSはユーザー操作内で play() を呼ぶのが重要
+        const p = audio.play();
+        if (p && typeof p.then === 'function') await p;
+
+        setState('再生中');
+        log('');
+        startLoopTimer();
+      } catch (e) {
+        // よくある: NotAllowedError / AbortError など
+        setState('再生失敗');
+        log('再生できませんでした。\n・もう一度「▶ 再生」を押す\n・音量ミュート解除\n・Safariで開く(PWA不可の場合あり)\nエラー: ' + (e && e.name ? e.name : e));
+      }
+    }
+
+    function pause() {
+      audio.pause();
+      setState('一時停止');
+      stopLoopTimer();
+    }
+
+    function stop() {
+      audio.pause();
+      audio.currentTime = 0;
+      setState('停止');
+      stopLoopTimer();
+    }
+
+    function skip(sec) {
+      if (!hasLoaded()) return;
+      const next = clampTime(audio.currentTime + sec);
+      audio.currentTime = next;
+    }
+
+    // UIイベント
+    loadBtn.addEventListener('click', loadSelectedFile);
+
+    playBtn.addEventListener('click', safePlay);
+    pauseBtn.addEventListener('click', pause);
+    stopBtn.addEventListener('click', stop);
+
+    speed.addEventListener('input', () => {
+      const v = Number(speed.value);
+      speedValue.textContent = v.toFixed(2) + 'x';
+      audio.playbackRate = v;
+      setPreservePitch();
     });
 
-    pauseBtn.addEventListener('click', () => {
-      audioEl.pause();
+    setABtn.addEventListener('click', () => {
+      if (!hasLoaded()) { alert('先に音源を読み込んでください'); return; }
+      A = audio.currentTime;
+      // Aを置いたらBは一旦無効化（誤ループ防止）
+      B = null;
+      updateLoopStatus();
     });
 
-    pitch.addEventListener('input', async () => {
-      pitchValue.textContent = pitch.value;
-      if (pitchShift) pitchShift.pitch = Number(pitch.value);
+    setBBtn.addEventListener('click', () => {
+      if (!hasLoaded()) { alert('先に音源を読み込んでください'); return; }
+      if (A === null) { alert('先にAを設定してください'); return; }
+
+      const candidate = audio.currentTime;
+      if (candidate <= A + 0.05) {
+        alert('BはAより後に設定してください');
+        return;
+      }
+      B = candidate;
+      updateLoopStatus();
+      startLoopTimer();
+    });
+
+    clearLoopBtn.addEventListener('click', () => {
+      clearLoop();
+      stopLoopTimer();
+    });
+
+    back10.addEventListener('click', () => skip(-10));
+    fwd10.addEventListener('click', () => skip(10));
+
+    // 再生位置表示
+    audio.addEventListener('timeupdate', () => {
+      timeText.textContent = (audio.currentTime || 0).toFixed(1);
+      if (A !== null && B !== null && audio.currentTime >= B) {
+        audio.currentTime = A;
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      setState('終了');
+      stopLoopTimer();
+    });
+
+    audio.addEventListener('pause', () => {
+      // ユーザーがaudio標準UIで止めた場合も同期
+      if (audio.currentTime > 0 && audio.currentTime < (audio.duration || Infinity)) {
+        setState('一時停止');
+      }
+      stopLoopTimer();
+    });
+
+    audio.addEventListener('play', () => {
+      setState('再生中');
+      startLoopTimer();
     });
 
     // 初期表示
-    pitchValue.textContent = pitch.value;
+    speedValue.textContent = Number(speed.value).toFixed(2) + 'x';
+    setPreservePitch();
+    setState('未読み込み');
+    log('音源を選んで「読み込み」→「▶ 再生」で開始します。');
   </script>
 </body>
 </html>
-
