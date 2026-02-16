@@ -1,80 +1,87 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Practice Player</title>
-
+  <title>Pitch Player</title>
   <style>
     body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
-    .card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:560px;margin:0 auto;}
+    .card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:560px;margin:0 auto;}
+    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
     input[type=range]{width:100%;}
     button{padding:10px 16px;margin:6px;font-size:15px;}
     .big{font-size:18px;font-weight:bold;}
-    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
-    .hint{font-size:12px;color:#555;line-height:1.4;text-align:left;}
+    .hint{font-size:12px;color:#555;line-height:1.4;margin-top:8px;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
+
+  <!-- Tone.js (CDN) -->
+  <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
 </head>
 
 <body>
   <div class="card">
-    <h2>🎸 練習用プレイヤー</h2>
+    <h2>🎸 半音ピッチプレイヤー</h2>
 
     <div class="row">
       <input type="file" id="fileInput" accept="audio/*" />
       <button id="loadBtn">読み込み</button>
+      <button id="playBtn">再生</button>
+      <button id="pauseBtn">停止</button>
     </div>
 
     <p class="hint">
-      ※ iPhoneは「読み込み」を押してから再生すると安定します。<br>
-      ※ iPhoneのホーム画面追加(PWA)だとファイル選択が動かない場合があります。その時はSafariで開いて試してください。
+      ※ iPhoneは <b>「読み込み」→「再生」</b> の順が安定します。<br>
+      ※ 音が二重に聞こえる時は、下の音量を 0 にしています（処理後の音だけ出します）。
     </p>
 
-    <audio id="audio" controls playsinline></audio>
+    <!-- audio要素は「制御用」（実音はWebAudio側から出す） -->
+    <audio id="audio" controls playsinline class="mono" style="width:100%; margin-top:10px;"></audio>
 
-    <h3>再生速度（ピッチ維持）</h3>
-    <input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1" />
-    <p class="big" id="speedValue">1.00x</p>
-
-    <h3>A-Bループ</h3>
-    <div class="row">
-      <button id="setABtn">A設定</button>
-      <button id="setBBtn">B設定</button>
-      <button id="clearLoopBtn">解除</button>
-    </div>
-    <p id="loopStatus">未設定</p>
-
-    <h3>10秒戻る / 進む</h3>
-    <div class="row">
-      <button id="back10">◀ 10秒</button>
-      <button id="fwd10">10秒 ▶</button>
-    </div>
+    <h3>ピッチ（半音）</h3>
+    <input type="range" id="pitch" min="-12" max="12" step="1" value="0" />
+    <p class="big"><span id="pitchValue">0</span>（半音）</p>
   </div>
 
   <script>
-    const audio = document.getElementById('audio');
+    const audioEl = document.getElementById('audio');
     const fileInput = document.getElementById('fileInput');
     const loadBtn = document.getElementById('loadBtn');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
 
-    const speed = document.getElementById('speed');
-    const speedValue = document.getElementById('speedValue');
+    const pitch = document.getElementById('pitch');
+    const pitchValue = document.getElementById('pitchValue');
 
-    const loopStatus = document.getElementById('loopStatus');
-    const setABtn = document.getElementById('setABtn');
-    const setBBtn = document.getElementById('setBBtn');
-    const clearLoopBtn = document.getElementById('clearLoopBtn');
-
-    const back10 = document.getElementById('back10');
-    const fwd10 = document.getElementById('fwd10');
-
-    let A = null;
-    let B = null;
     let blobUrl = null;
 
-    function setPreservePitch() {
-      // ブラウザ差異吸収
-      audio.preservesPitch = true;
-      audio.webkitPreservesPitch = true;
+    // Tone.js nodes
+    let mediaSource = null;
+    let pitchShift = null;
+    let ready = false;
+
+    async function ensureAudioGraph() {
+      if (ready) return;
+
+      // iOS対策：ユーザー操作中にAudioContext開始
+      await Tone.start();
+
+      // audio要素 → WebAudio(Tone) へ取り込み
+      mediaSource = Tone.context.createMediaElementSource(audioEl);
+
+      pitchShift = new Tone.PitchShift({
+        pitch: Number(pitch.value), // 半音
+        windowSize: 0.1
+      });
+
+      // つなぐ：mediaSource -> pitchShift -> destination
+      mediaSource.connect(pitchShift);
+      pitchShift.toDestination();
+
+      // 元のaudio出力はミュート（処理後だけ鳴らす）
+      audioEl.volume = 0;
+
+      ready = true;
     }
 
     function loadSelectedFile() {
@@ -83,70 +90,38 @@
         alert('音源ファイルを選んでください');
         return;
       }
-
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       blobUrl = URL.createObjectURL(f);
-
-      audio.src = blobUrl;
-      audio.load();               // iOSで止まりにくくする
-      setPreservePitch();
-
-      // ループ状態リセット
-      A = null; B = null;
-      loopStatus.innerText = '未設定';
+      audioEl.src = blobUrl;
+      audioEl.load();
     }
 
-    loadBtn.addEventListener('click', loadSelectedFile);
-
-    fileInput.addEventListener('change', () => {
-      // 選び直したら「読み込み」を押してね、の状態へ
-      A = null; B = null;
-      loopStatus.innerText = '未設定';
+    loadBtn.addEventListener('click', async () => {
+      loadSelectedFile();
+      await ensureAudioGraph();
+      // iOSは自動再生がブロックされるので、ここでは再生しない
     });
 
-    speed.addEventListener('input', () => {
-      audio.playbackRate = Number(speed.value);
-      setPreservePitch();
-      speedValue.innerText = Number(speed.value).toFixed(2) + 'x';
-    });
-
-    setABtn.addEventListener('click', () => {
-      if (!audio.src) { alert('先に音源を読み込んでください'); return; }
-      A = audio.currentTime;
-      loopStatus.innerText = 'A:' + A.toFixed(1);
-    });
-
-    setBBtn.addEventListener('click', () => {
-      if (!audio.src) { alert('先に音源を読み込んでください'); return; }
-      if (A === null) { alert('先にAを設定してください'); return; }
-      B = audio.currentTime;
-      if (B <= A) { alert('BはAより後にしてください'); return; } // ← ここが途切れてた部分
-      loopStatus.innerText = 'A:' + A.toFixed(1) + ' / B:' + B.toFixed(1);
-    });
-
-    clearLoopBtn.addEventListener('click', () => {
-      A = null; B = null;
-      loopStatus.innerText = '解除';
-    });
-
-    function skip(sec) {
-      if (!audio.duration) return;
-      audio.currentTime = Math.min(Math.max(audio.currentTime + sec, 0), audio.duration);
-    }
-
-    back10.addEventListener('click', () => skip(-10));
-    fwd10.addEventListener('click', () => skip(10));
-
-    audio.addEventListener('timeupdate', () => {
-      if (A !== null && B !== null && audio.currentTime >= B) {
-        audio.currentTime = A;
+    playBtn.addEventListener('click', async () => {
+      await ensureAudioGraph();
+      if (!audioEl.src) {
+        alert('先に「読み込み」でファイルを読み込んでください');
+        return;
       }
+      await audioEl.play();
     });
 
-    // 念のため：ページ離脱時にblob解放
-    window.addEventListener('beforeunload', () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    pauseBtn.addEventListener('click', () => {
+      audioEl.pause();
     });
+
+    pitch.addEventListener('input', async () => {
+      pitchValue.textContent = pitch.value;
+      if (pitchShift) pitchShift.pitch = Number(pitch.value);
+    });
+
+    // 初期表示
+    pitchValue.textContent = pitch.value;
   </script>
 </body>
 </html>
