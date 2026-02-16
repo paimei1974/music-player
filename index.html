@@ -1,430 +1,78 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Practice Player</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Practice Player</title>
 
-  <style>
-    body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
-    .card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:760px;margin:0 auto;}
-    input[type=range]{width:100%;}
-    button{padding:10px 16px;margin:6px;font-size:15px;}
-    .big{font-size:18px;font-weight:bold;}
-    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
-    .hint{font-size:12px;color:#555;line-height:1.5;text-align:left;margin:10px auto 0;max-width:700px;}
-    .sep{height:1px;background:#eee;margin:14px 0;}
-    .status{font-size:13px;color:#333;margin-top:6px;}
-    .danger{color:#b00020;}
-    .pill{display:inline-block;padding:2px 10px;border:1px solid #ddd;border-radius:999px;font-size:12px;background:#fafafa;}
-    .grid{display:grid;grid-template-columns:1fr;gap:10px;max-width:700px;margin:0 auto;}
-    @media(min-width:700px){
-      .grid{grid-template-columns:1fr 1fr;}
-    }
-  </style>
-
-  <!-- SoundTouchJS（ピッチシフト） -->
-  <script src="https://unpkg.com/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+<style>
+body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
+.card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:600px;margin:auto;}
+button{padding:10px 16px;margin:6px;}
+input[type=range]{width:100%;}
+</style>
 </head>
 
 <body>
-  <div class="card">
-    <h2>🎸 練習用プレイヤー（キー上下対応）</h2>
+<div class="card">
+<h2>練習用プレイヤー（キー変更対応）</h2>
 
-    <div class="row">
-      <input type="file" id="fileInput" accept="audio/*" />
-      <button id="loadBtn">読み込み</button>
-      <button id="playBtn">再生</button>
-      <button id="pauseBtn">停止</button>
-    </div>
+<input type="file" id="file"><br><br>
 
-    <div class="hint">
-      <div>
-        <span class="pill">iPhone Safari対策</span>
-        「読み込み」→「再生」の順で押すと安定します。<br>
-        ※ ホーム画面追加(PWA)だとファイル選択が動かない場合があります。その時はSafariで開いて試してください。
-      </div>
-    </div>
+<button onclick="play()">再生</button>
+<button onclick="stop()">停止</button>
 
-    <div class="sep"></div>
+<h3>キー変更</h3>
+<button onclick="pitchDown()">−</button>
+<span id="pitchVal">0</span>
+<button onclick="pitchUp()">＋</button>
+</div>
 
-    <div class="row">
-      <button id="back10">◀ 10秒</button>
-      <button id="back5">◀ 5秒</button>
-      <button id="fwd5">5秒 ▶</button>
-      <button id="fwd10">10秒 ▶</button>
-    </div>
+<script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
 
-    <div class="row" style="max-width:700px;margin:0 auto;">
-      <input type="range" id="seek" min="0" max="1000" value="0" />
-    </div>
-    <div class="status" id="timeLabel">00:00 / 00:00</div>
+<script>
+let audioCtx;
+let buffer;
+let pitch = 0;
+let source;
 
-    <div class="sep"></div>
+document.getElementById("file").onchange = async e=>{
+    const file = e.target.files[0];
+    audioCtx = new AudioContext();
+    const arr = await file.arrayBuffer();
+    buffer = await audioCtx.decodeAudioData(arr);
+};
 
-    <div class="grid">
-      <div>
-        <h3>テンポ（速度）</h3>
-        <input type="range" id="tempo" min="0.5" max="1.5" step="0.01" value="1" />
-        <p class="big" id="tempoValue">1.00x</p>
-      </div>
+function play(){
+    if(!buffer) return;
+    stop();
 
-      <div>
-        <h3>キー（音程：半音）</h3>
-        <input type="range" id="pitch" min="-12" max="12" step="1" value="0" />
-        <p class="big" id="pitchValue">±0</p>
-        <div class="row">
-          <button id="pitchDown">-1</button>
-          <button id="pitchZero">0</button>
-          <button id="pitchUp">+1</button>
-        </div>
-      </div>
-    </div>
+    const st = new soundtouch.SoundTouch(audioCtx.sampleRate);
+    st.pitch = Math.pow(2, pitch/12);
 
-    <div class="sep"></div>
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
 
-    <h3>A-Bループ</h3>
-    <div class="row">
-      <button id="setABtn">A設定</button>
-      <button id="setBBtn">B設定</button>
-      <button id="toggleLoopBtn">ループON/OFF</button>
-      <button id="clearLoopBtn">解除</button>
-    </div>
-    <p class="status" id="loopStatus">未設定</p>
-  </div>
+    const node = soundtouch.getWebAudioNode(audioCtx, src, st);
+    node.connect(audioCtx.destination);
 
-  <script>
-    // ========= UI =========
-    const fileInput = document.getElementById('fileInput');
-    const loadBtn = document.getElementById('loadBtn');
-    const playBtn = document.getElementById('playBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
+    src.start(0);
+    source = src;
+}
 
-    const seek = document.getElementById('seek');
-    const timeLabel = document.getElementById('timeLabel');
+function stop(){
+    if(source) source.stop();
+}
 
-    const tempo = document.getElementById('tempo');
-    const tempoValue = document.getElementById('tempoValue');
+function pitchUp(){
+    pitch++;
+    document.getElementById("pitchVal").innerText = pitch;
+}
 
-    const pitch = document.getElementById('pitch');
-    const pitchValue = document.getElementById('pitchValue');
-    const pitchDown = document.getElementById('pitchDown');
-    const pitchUp = document.getElementById('pitchUp');
-    const pitchZero = document.getElementById('pitchZero');
-
-    const loopStatus = document.getElementById('loopStatus');
-    const setABtn = document.getElementById('setABtn');
-    const setBBtn = document.getElementById('setBBtn');
-    const toggleLoopBtn = document.getElementById('toggleLoopBtn');
-    const clearLoopBtn = document.getElementById('clearLoopBtn');
-
-    const back10 = document.getElementById('back10');
-    const back5 = document.getElementById('back5');
-    const fwd5 = document.getElementById('fwd5');
-    const fwd10 = document.getElementById('fwd10');
-
-    // ========= Audio / SoundTouch =========
-    let ctx = null;
-    let buffer = null;            // AudioBuffer
-    let st = null;                // SoundTouch instance
-    let filter = null;            // SimpleFilter
-    let node = null;              // ScriptProcessorNode
-
-    let isPlaying = false;
-    let startWallTime = 0;        // 再生開始時刻（ctx.currentTime）
-    let startSamplePos = 0;       // 再生開始時のサンプル位置（元音源基準）
-    let samplePos = 0;            // 現在サンプル位置（元音源基準）
-    let durationSec = 0;
-    let rafId = null;
-
-    // AB loop
-    let A = null; // sec
-    let B = null; // sec
-    let loopEnabled = true;
-
-    // ScriptProcessor バッファサイズ（小さすぎると負荷/途切れ、大きすぎると遅延）
-    const PROCESSOR_SIZE = 2048;
-
-    function ensureContext() {
-      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    function formatTime(sec) {
-      if (!Number.isFinite(sec) || sec < 0) sec = 0;
-      const m = Math.floor(sec / 60);
-      const s = Math.floor(sec % 60);
-      return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-    }
-
-    function updateTempoUI() {
-      tempoValue.textContent = Number(tempo.value).toFixed(2) + 'x';
-    }
-    function updatePitchUI() {
-      const v = Number(pitch.value);
-      pitchValue.textContent = (v === 0) ? '±0' : (v > 0 ? `+${v}` : `${v}`);
-    }
-
-    function updateLoopStatus() {
-      if (A === null && B === null) {
-        loopStatus.textContent = '未設定';
-        loopStatus.className = 'status';
-        return;
-      }
-      const parts = [];
-      if (A !== null) parts.push('A:' + A.toFixed(1));
-      if (B !== null) parts.push('B:' + B.toFixed(1));
-      parts.push(loopEnabled ? '（ループON）' : '（ループOFF）');
-      loopStatus.textContent = parts.join(' / ');
-      loopStatus.className = 'status';
-      if (A !== null && B !== null && B <= A) loopStatus.classList.add('danger');
-    }
-
-    function secToSample(sec) {
-      if (!buffer) return 0;
-      return Math.max(0, Math.min(buffer.length, Math.floor(sec * buffer.sampleRate)));
-    }
-    function sampleToSec(sample) {
-      if (!buffer) return 0;
-      return sample / buffer.sampleRate;
-    }
-
-    function stopEngine() {
-      isPlaying = false;
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = null;
-
-      if (node) {
-        try { node.disconnect(); } catch(e) {}
-        node.onaudioprocess = null;
-        node = null;
-      }
-      filter = null;
-    }
-
-    function rebuildEngineFrom(sampleStart) {
-      // SoundTouch のソースは “元バッファ” を読む
-      const source = new window.soundtouch.BufferSource(buffer);
-      source._position = sampleStart; // 内部位置（実装依存だけど SoundTouchJS はこれで動くことが多い）
-
-      st = new window.soundtouch.SoundTouch(buffer.sampleRate);
-      st.tempo = Number(tempo.value);                // テンポ（速度）
-      st.pitchSemitones = Number(pitch.value);       // ピッチ（半音）
-
-      filter = new window.soundtouch.SimpleFilter(source, st);
-
-      node = ctx.createScriptProcessor(PROCESSOR_SIZE, 2, 2);
-      node.onaudioprocess = (e) => {
-        const outL = e.outputBuffer.getChannelData(0);
-        const outR = e.outputBuffer.getChannelData(1);
-
-        // SoundTouch からフレーム取得
-        const frames = filter.extract(outL, outL.length);
-        if (frames === 0) {
-          // 終端
-          stopEngine();
-          return;
-        }
-        // outR にもコピー（ステレオ素材は SoundTouchJS 側が対応しきれない場合があるので簡易対応）
-        outR.set(outL);
-
-        // samplePos を“だいたい”進める（テンポ変化があるので厳密ではないがUI用途なら十分）
-        samplePos = source._position || samplePos + frames;
-
-        // ABループ（secで判定→サンプルに戻す）
-        if (loopEnabled && A !== null && B !== null && B > A) {
-          const curSec = sampleToSec(samplePos);
-          if (curSec >= B) {
-            const aS = secToSample(A);
-            source._position = aS;
-            samplePos = aS;
-          }
-        }
-      };
-
-      node.connect(ctx.destination);
-    }
-
-    async function loadSelectedFile() {
-      const f = fileInput.files && fileInput.files[0];
-      if (!f) {
-        alert('音源ファイルを選んでください');
-        return;
-      }
-
-      ensureContext();
-      // iOS Safari: ユーザー操作内で resume すると安定
-      await ctx.resume();
-
-      const arrayBuf = await f.arrayBuffer();
-      buffer = await ctx.decodeAudioData(arrayBuf);
-      durationSec = buffer.duration;
-
-      // 位置リセット
-      stopEngine();
-      samplePos = 0;
-      startSamplePos = 0;
-      startWallTime = 0;
-
-      // ループリセット
-      A = null; B = null; loopEnabled = true;
-      updateLoopStatus();
-
-      // UI反映
-      seek.value = 0;
-      timeLabel.textContent = `${formatTime(0)} / ${formatTime(durationSec)}`;
-
-      alert('読み込み完了！「再生」を押してください');
-    }
-
-    async function playFromCurrent() {
-      if (!buffer) {
-        alert('先に「読み込み」を押して音源を読み込んでください');
-        return;
-      }
-      ensureContext();
-      await ctx.resume();
-
-      // すでに再生中なら何もしない
-      if (isPlaying) return;
-
-      // エンジン再構築して再生
-      rebuildEngineFrom(samplePos);
-      isPlaying = true;
-      startWallTime = ctx.currentTime;
-      startSamplePos = samplePos;
-
-      tickUI();
-    }
-
-    function pause() {
-      stopEngine();
-    }
-
-    function skip(sec) {
-      if (!buffer) return;
-      const cur = sampleToSec(samplePos);
-      let next = cur + sec;
-      next = Math.max(0, Math.min(durationSec, next));
-      samplePos = secToSample(next);
-
-      // 再生中なら再構築（SoundTouchはシークが弱いので作り直すのが確実）
-      if (isPlaying) {
-        stopEngine();
-        playFromCurrent();
-      } else {
-        // UI更新だけ
-        updateSeekUI();
-      }
-    }
-
-    function updateSeekUI() {
-      const curSec = sampleToSec(samplePos);
-      const ratio = durationSec ? (curSec / durationSec) : 0;
-      seek.value = Math.round(ratio * 1000);
-      timeLabel.textContent = `${formatTime(curSec)} / ${formatTime(durationSec)}`;
-    }
-
-    function tickUI() {
-      if (!buffer) return;
-
-      // 再生中は “おおよそ” で時間を進める（精密同期は難しい）
-      if (isPlaying) {
-        // テンポを考慮してざっくり進める
-        const elapsed = ctx.currentTime - startWallTime;
-        const approxSec = sampleToSec(startSamplePos) + elapsed * Number(tempo.value);
-        const clamped = Math.min(Math.max(0, approxSec), durationSec);
-        samplePos = secToSample(clamped);
-      }
-
-      updateSeekUI();
-      rafId = requestAnimationFrame(tickUI);
-    }
-
-    function applyTempoPitchLive() {
-      // 再生中に変えても反映されにくいので、再生中は作り直す
-      if (isPlaying) {
-        stopEngine();
-        playFromCurrent();
-      }
-    }
-
-    // ========= Events =========
-    loadBtn.addEventListener('click', loadSelectedFile);
-    playBtn.addEventListener('click', playFromCurrent);
-    pauseBtn.addEventListener('click', pause);
-
-    back10.addEventListener('click', () => skip(-10));
-    back5.addEventListener('click', () => skip(-5));
-    fwd5.addEventListener('click', () => skip(5));
-    fwd10.addEventListener('click', () => skip(10));
-
-    seek.addEventListener('input', () => {
-      if (!buffer) return;
-      const ratio = Number(seek.value) / 1000;
-      const targetSec = ratio * durationSec;
-      samplePos = secToSample(targetSec);
-      updateSeekUI();
-    });
-    seek.addEventListener('change', () => {
-      // 指を離したら反映（再生中なら再構築）
-      if (isPlaying) {
-        stopEngine();
-        playFromCurrent();
-      }
-    });
-
-    tempo.addEventListener('input', () => {
-      updateTempoUI();
-      applyTempoPitchLive();
-    });
-
-    pitch.addEventListener('input', () => {
-      updatePitchUI();
-      applyTempoPitchLive();
-    });
-
-    pitchDown.addEventListener('click', () => {
-      pitch.value = Math.max(-12, Number(pitch.value) - 1);
-      updatePitchUI();
-      applyTempoPitchLive();
-    });
-    pitchUp.addEventListener('click', () => {
-      pitch.value = Math.min(12, Number(pitch.value) + 1);
-      updatePitchUI();
-      applyTempoPitchLive();
-    });
-    pitchZero.addEventListener('click', () => {
-      pitch.value = 0;
-      updatePitchUI();
-      applyTempoPitchLive();
-    });
-
-    setABtn.addEventListener('click', () => {
-      if (!buffer) return;
-      A = sampleToSec(samplePos);
-      if (B !== null && B <= A) B = null;
-      updateLoopStatus();
-    });
-    setBBtn.addEventListener('click', () => {
-      if (!buffer) return;
-      if (A === null) { alert('先にAを設定してください'); return; }
-      B = sampleToSec(samplePos);
-      if (B <= A) { alert('BはAより後ろに設定してください'); B = null; }
-      updateLoopStatus();
-    });
-    toggleLoopBtn.addEventListener('click', () => {
-      loopEnabled = !loopEnabled;
-      updateLoopStatus();
-    });
-    clearLoopBtn.addEventListener('click', () => {
-      A = null; B = null; loopEnabled = true;
-      updateLoopStatus();
-    });
-
-    // init UI
-    updateTempoUI();
-    updatePitchUI();
-    updateLoopStatus();
-  </script>
+function pitchDown(){
+    pitch--;
+    document.getElementById("pitchVal").innerText = pitch;
+}
+</script>
 </body>
 </html>
