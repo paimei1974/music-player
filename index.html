@@ -1,69 +1,26 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Practice Player</title>
+<title>Audio Test</title>
 </head>
 
 <body>
 
-<h2>キー変更プレイヤー</h2>
+<h2>再生テスト</h2>
 
 <input type="file" id="file"><br><br>
 
-<button id="playBtn">再生</button>
-<button onclick="stop()">停止</button>
-
-<h3>キー</h3>
-<button onclick="pitchDown()">−</button>
-<span id="pitchVal">0</span>
-<button onclick="pitchUp()">＋</button>
-
-<script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+<audio id="audio" controls></audio>
 
 <script>
-let audioCtx;
-let buffer;
-let pitch = 0;
-let source;
+const audio = document.getElementById("audio");
 
-document.getElementById("file").onchange = async e=>{
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const arr = await e.target.files[0].arrayBuffer();
-    buffer = await audioCtx.decodeAudioData(arr);
+document.getElementById("file").onchange = e=>{
+    const f = e.target.files[0];
+    audio.src = URL.createObjectURL(f);
 };
-
-document.getElementById("playBtn").onclick = async ()=>{
-    if(!buffer) return;
-
-    await audioCtx.resume(); // ← Safari必須
-
-    const st = new soundtouch.SoundTouch(audioCtx.sampleRate);
-    st.pitch = Math.pow(2, pitch/12);
-
-    const src = audioCtx.createBufferSource();
-    src.buffer = buffer;
-
-    const node = soundtouch.getWebAudioNode(audioCtx, src, st);
-    node.connect(audioCtx.destination);
-
-    src.start(0);
-    source = src;
-};
-
-function stop(){
-    if(source) source.stop();
-}
-
-function pitchUp(){
-    pitch++;
-    document.getElementById("pitchVal").innerText = pitch;
-}
-function pitchDown(){
-    pitch--;
-    document.getElementById("pitchVal").innerText = pitch;
-}
 </script>
 
 </body>
