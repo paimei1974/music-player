@@ -1,88 +1,28 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Practice Player</title>
 
   <style>
-    :root{
-      --bg:#f5f6fa;
-      --card:#fff;
-      --text:#111;
-      --muted:#555;
-      --line:rgba(0,0,0,.08);
-      --shadow:0 10px 30px rgba(0,0,0,.10);
-      --radius:14px;
-    }
-    body{
-      font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;
-      text-align:center;
-      padding:18px;
-      background:var(--bg);
-      color:var(--text);
-      margin:0;
-    }
-    .card{
-      background:var(--card);
-      padding:18px;
-      border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      max-width:640px;
-      margin:0 auto;
-      border:1px solid var(--line);
-    }
-    h2{ margin:4px 0 10px; }
-    h3{ margin:18px 0 8px; font-size:16px; }
-    .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; align-items:center; }
-    .row.tight{ gap:8px; }
-    .hint{
-      font-size:12px;
-      color:var(--muted);
-      line-height:1.45;
-      margin:8px 0 0;
-      text-align:left;
-    }
-    input[type="range"]{ width:100%; }
-    button{
-      padding:10px 14px;
-      margin:0;
-      font-size:15px;
-      border-radius:12px;
-      border:1px solid var(--line);
-      background:#fff;
-      cursor:pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    button.primary{ font-weight:700; }
-    button:disabled{ opacity:.45; cursor:not-allowed; }
-    .big{ font-size:18px; font-weight:800; margin:8px 0 0; }
-    .pill{
-      display:inline-block;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--line);
-      font-size:12px;
-      color:var(--muted);
-      background:#fff;
-    }
-    .status{
-      margin:10px 0 0;
-      display:flex;
-      gap:10px;
-      justify-content:space-between;
-      align-items:center;
-      flex-wrap:wrap;
-      border-top:1px solid var(--line);
-      padding-top:10px;
-    }
-    .status .left{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .mono{ font-variant-numeric: tabular-nums; font-feature-settings:"tnum"; }
-    .sep{ height:1px; background:var(--line); margin:14px 0; }
-    audio{ width:100%; margin-top:10px; }
-    .small{ font-size:12px; color:var(--muted); margin:6px 0 0; text-align:left; }
-    .kbd{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; font-size:11px; padding:2px 6px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    body{font-family:sans-serif;text-align:center;padding:20px;background:#f5f6fa;}
+    .card{background:white;padding:20px;border-radius:12px;box-shadow:0 5px 20px rgba(0,0,0,0.1);max-width:640px;margin:0 auto;}
+    button{padding:10px 16px;margin:6px;font-size:15px;}
+    .big{font-size:18px;font-weight:bold;}
+    .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;align-items:center;}
+    .hint{font-size:12px;color:#555;line-height:1.4;margin:8px 0 14px;}
+    input[type=range]{width:100%;}
+    .time{font-variant-numeric: tabular-nums;}
+    .pill{display:inline-block;padding:2px 10px;border-radius:999px;background:#eef2ff;}
+    .muted{color:#666;font-size:12px;}
+    .section{margin-top:18px;}
+    .label{margin:8px 0 6px;font-weight:bold;}
   </style>
+
+  <!-- Pitch-shift (tempo fixed) library -->
+  <!-- If this CDN ever changes, swap to another SoundTouch.js CDN. -->
+  <script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
 </head>
 
 <body>
@@ -91,300 +31,351 @@
 
     <div class="row">
       <input type="file" id="fileInput" accept="audio/*" />
-      <button id="loadBtn" class="primary">読み込み</button>
+      <button id="loadBtn">読み込み</button>
     </div>
 
     <p class="hint">
-      ■ iPhone対策<br>
-      ・「読み込み」を押してから再生すると安定しやすいです。<br>
-      ・ホーム画面追加（PWA）だとファイル選択が動かないことがあります。その時はSafariで開いて試してください。<br>
-      ・再生が無音/止まる時は一度「▶︎再生→⏸停止」をしてから操作すると直ることがあります（iOSの制限）。
+      ※ iPhoneは「読み込み」を押してから再生すると安定します。<br>
+      ※ iPhoneのホーム画面追加(PWA)だとファイル選択が動かない場合があります。その時はSafariで開いて試してください。
     </p>
 
-    <audio id="audio" controls playsinline></audio>
+    <div class="row">
+      <button id="playBtn">▶ 再生</button>
+      <button id="pauseBtn">⏸ 一時停止</button>
+      <button id="stopBtn">⏹ 停止</button>
+      <span class="pill time" id="timeText">00:00 / 00:00</span>
+    </div>
 
-    <div class="status">
-      <div class="left">
-        <span class="pill mono" id="timeText">00:00 / 00:00</span>
-        <span class="pill mono" id="rateText">Rate: 1.00x</span>
-        <span class="pill mono" id="loopText">Loop: Off</span>
+    <div class="section">
+      <div class="label">シーク</div>
+      <input type="range" id="seek" min="0" max="1000" step="1" value="0" />
+      <div class="muted">※ドラッグで移動</div>
+    </div>
+
+    <div class="section">
+      <div class="label">キー変更（速度固定 / カラオケっぽい）</div>
+      <input type="range" id="key" min="-12" max="12" step="1" value="0" />
+      <p class="big" id="keyValue">0（±0）</p>
+      <div class="muted">-12 = 1オクターブ下 / +12 = 1オクターブ上</div>
+    </div>
+
+    <div class="section">
+      <div class="label">A-Bループ</div>
+      <div class="row">
+        <button id="setABtn">A設定</button>
+        <button id="setBBtn">B設定</button>
+        <button id="clearLoopBtn">解除</button>
       </div>
-      <div class="right">
-        <button id="resetBtn">リセット</button>
+      <p id="loopStatus">未設定</p>
+    </div>
+
+    <div class="section">
+      <div class="label">10秒戻る / 進む</div>
+      <div class="row">
+        <button id="back10">◀ 10秒</button>
+        <button id="fwd10">10秒 ▶</button>
       </div>
     </div>
-
-    <div class="sep"></div>
-
-    <h3>再生速度（ピッチ維持）</h3>
-    <input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1" />
-    <p class="big mono" id="speedValue">1.00x</p>
-    <p class="small">
-      ※「ピッチ維持」はブラウザ依存です。iPhone/Safariは <span class="kbd">preservesPitch</span> が効くことが多いですが、状況により変わります。
-    </p>
-
-    <h3>A-Bループ</h3>
-    <div class="row tight">
-      <button id="setABtn">A設定</button>
-      <button id="setBBtn">B設定</button>
-      <button id="toggleLoopBtn">ループON/OFF</button>
-      <button id="clearLoopBtn">解除</button>
-    </div>
-    <p class="mono" id="loopStatus">未設定</p>
-
-    <h3>10秒戻る / 進む</h3>
-    <div class="row tight">
-      <button id="back10">◀ 10秒</button>
-      <button id="fwd10">10秒 ▶</button>
-    </div>
-
-    <h3>小刻み</h3>
-    <div class="row tight">
-      <button data-skip="-1">◀ 1秒</button>
-      <button data-skip="1">1秒 ▶</button>
-      <button data-skip="-3">◀ 3秒</button>
-      <button data-skip="3">3秒 ▶</button>
-    </div>
-
-    <div class="sep"></div>
-    <p class="small">
-      使い方：ファイル選択 →「読み込み」→再生 → A設定 → B設定 → ループON/OFF<br>
-      ※BはAより後ろで設定してください（逆だと警告します）。
-    </p>
   </div>
 
   <script>
-    const audio = document.getElementById('audio');
     const fileInput = document.getElementById('fileInput');
-    const loadBtn = document.getElementById('loadBtn');
+    const loadBtn   = document.getElementById('loadBtn');
 
-    const speed = document.getElementById('speed');
-    const speedValue = document.getElementById('speedValue');
+    const playBtn  = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn  = document.getElementById('stopBtn');
 
+    const seek     = document.getElementById('seek');
     const timeText = document.getElementById('timeText');
-    const rateText = document.getElementById('rateText');
-    const loopText = document.getElementById('loopText');
 
-    const loopStatus = document.getElementById('loopStatus');
-    const setABtn = document.getElementById('setABtn');
-    const setBBtn = document.getElementById('setBBtn');
-    const toggleLoopBtn = document.getElementById('toggleLoopBtn');
+    const key      = document.getElementById('key');
+    const keyValue = document.getElementById('keyValue');
+
+    const loopStatus   = document.getElementById('loopStatus');
+    const setABtn      = document.getElementById('setABtn');
+    const setBBtn      = document.getElementById('setBBtn');
     const clearLoopBtn = document.getElementById('clearLoopBtn');
 
     const back10 = document.getElementById('back10');
-    const fwd10 = document.getElementById('fwd10');
-    const resetBtn = document.getElementById('resetBtn');
+    const fwd10  = document.getElementById('fwd10');
 
-    let A = null;
-    let B = null;
-    let loopEnabled = false;
-    let blobUrl = null;
+    // ---- audio engine state ----
+    let audioCtx = null;
+    let buffer = null;
 
-    // ---------- utilities ----------
-    function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+    let soundTouch = null;
+    let stSource = null;
+    let stFilter = null;
+    let stNode = null;
 
-    function formatTime(sec){
-      if (!isFinite(sec)) return "00:00";
-      sec = Math.max(0, sec);
+    let isLoaded = false;
+    let isPlaying = false;
+
+    let A = null; // seconds
+    let B = null; // seconds
+
+    let rafId = null;
+    let ignoreSeekInput = false;
+
+    function fmtTime(sec) {
+      sec = Math.max(0, sec || 0);
       const m = Math.floor(sec / 60);
       const s = Math.floor(sec % 60);
-      return String(m).padStart(2,'0') + ":" + String(s).padStart(2,'0');
+      return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
     }
 
-    function updateTimeUI(){
-      const cur = audio.currentTime || 0;
-      const dur = audio.duration || 0;
-      timeText.textContent = `${formatTime(cur)} / ${formatTime(dur)}`;
-    }
-
-    function setPreservePitch(){
-      // ブラウザ差異吸収（存在しない場合もあるので try）
-      try { audio.preservesPitch = true; } catch(e) {}
-      try { audio.webkitPreservesPitch = true; } catch(e) {}
-      try { audio.mozPreservesPitch = true; } catch(e) {}
-    }
-
-    function setButtonsEnabled(enabled){
-      setABtn.disabled = !enabled;
-      setBBtn.disabled = !enabled;
-      toggleLoopBtn.disabled = !enabled;
-      clearLoopBtn.disabled = !enabled;
-      back10.disabled = !enabled;
-      fwd10.disabled = !enabled;
-      document.querySelectorAll('button[data-skip]').forEach(b => b.disabled = !enabled);
-    }
-
-    function updateLoopUI(){
-      if (A === null && B === null){
-        loopStatus.textContent = "未設定";
-      } else if (A !== null && B === null){
-        loopStatus.textContent = `A: ${A.toFixed(1)}s（B未設定）`;
-      } else {
-        loopStatus.textContent = `A: ${A.toFixed(1)}s / B: ${B.toFixed(1)}s`;
+    function ensureAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
-      loopText.textContent = `Loop: ${loopEnabled ? "On" : "Off"}`;
+      return audioCtx;
     }
 
-    function resetLoop(){
-      A = null; B = null; loopEnabled = false;
-      updateLoopUI();
+    function destroyEngine() {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+
+      try { if (stNode) stNode.disconnect(); } catch(e){}
+      stNode = null;
+      stFilter = null;
+      stSource = null;
+      soundTouch = null;
+
+      if (audioCtx) {
+        // keep context for iOS stability; just suspend
+        try { audioCtx.suspend(); } catch(e){}
+      }
+
+      isPlaying = false;
+      updateButtons();
     }
 
-    // ---------- file load ----------
-    function loadSelectedFile(){
-      const f = fileInput.files && fileInput.files[0];
-      if (!f){
-        alert('音源ファイルを選んでください');
+    function buildEngineFromBuffer() {
+      const ctx = ensureAudioCtx();
+
+      // SoundTouch is set with output sample rate
+      soundTouch = new window.soundtouch.SoundTouch(ctx.sampleRate);
+      soundTouch.tempo = 1.0; // speed fixed
+
+      // pitch ratio by semitone
+      const semi = Number(key.value);
+      soundTouch.pitch = Math.pow(2, semi / 12);
+
+      stSource = new window.soundtouch.BufferSource(buffer);
+      stFilter = new window.soundtouch.SimpleFilter(stSource, soundTouch);
+
+      // WebAudio node (ScriptProcessor internally)
+      stNode = window.soundtouch.getWebAudioNode(ctx, stFilter);
+
+      // A-B loop (sample position based)
+      // BufferSource.position is in samples (by SoundTouch.js implementation)
+      // We clamp inside the audio processing loop by periodically checking in UI loop and forcing position.
+    }
+
+    function currentTimeSec() {
+      if (!isLoaded || !audioCtx || !stSource) return 0;
+      const sr = audioCtx.sampleRate || 44100;
+      return (stSource.position || 0) / sr;
+    }
+
+    function durationSec() {
+      return buffer ? buffer.duration : 0;
+    }
+
+    function seekTo(sec) {
+      if (!isLoaded || !audioCtx || !stSource) return;
+      const d = durationSec();
+      sec = Math.max(0, Math.min(d, sec));
+      const sr = audioCtx.sampleRate || 44100;
+      stSource.position = Math.floor(sec * sr);
+    }
+
+    function updateButtons() {
+      playBtn.disabled  = !isLoaded || isPlaying;
+      pauseBtn.disabled = !isLoaded || !isPlaying;
+      stopBtn.disabled  = !isLoaded;
+      setABtn.disabled  = !isLoaded;
+      setBBtn.disabled  = !isLoaded;
+      clearLoopBtn.disabled = !isLoaded;
+      back10.disabled   = !isLoaded;
+      fwd10.disabled    = !isLoaded;
+      seek.disabled     = !isLoaded;
+      key.disabled      = !isLoaded;
+    }
+
+    function updateTimeUI() {
+      if (!isLoaded) {
+        timeText.textContent = '00:00 / 00:00';
         return;
       }
 
-      // 古い blob URL 解放
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-      blobUrl = URL.createObjectURL(f);
+      const t = currentTimeSec();
+      const d = durationSec();
+      timeText.textContent = `${fmtTime(t)} / ${fmtTime(d)}`;
 
-      audio.src = blobUrl;
-      audio.load();           // iOSの「先に進まない」対策
-      setPreservePitch();
+      // Update seek slider without fighting user dragging
+      if (!ignoreSeekInput) {
+        const v = d > 0 ? Math.round((t / d) * 1000) : 0;
+        seek.value = String(v);
+      }
 
-      // UI 初期化
-      speed.value = "1";
-      audio.playbackRate = 1;
-      speedValue.textContent = "1.00x";
-      rateText.textContent = "Rate: 1.00x";
-      resetLoop();
-      updateTimeUI();
+      // A-B loop enforcement
+      if (A !== null && B !== null && isPlaying) {
+        if (t >= B) {
+          seekTo(A);
+        }
+      }
 
-      // メタデータ読込後にボタン有効化
-      //（duration が取れない時は loadeddata でフォールバック）
+      // stop at end
+      if (isPlaying && d > 0 && t >= d) {
+        // loop off at end
+        isPlaying = false;
+        updateButtons();
+        try { audioCtx.suspend(); } catch(e){}
+      }
     }
 
+    function tick() {
+      updateTimeUI();
+      rafId = requestAnimationFrame(tick);
+    }
+
+    async function loadSelectedFile() {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) { alert('音源ファイルを選んでください'); return; }
+
+      destroyEngine();
+
+      const ctx = ensureAudioCtx();
+      // iOS: must resume on user gesture (we are in a click)
+      try { await ctx.resume(); } catch(e){}
+
+      const arrayBuf = await f.arrayBuffer();
+      buffer = await ctx.decodeAudioData(arrayBuf);
+
+      // reset loop points
+      A = null; B = null;
+      loopStatus.innerText = '未設定';
+
+      buildEngineFromBuffer();
+      isLoaded = true;
+      isPlaying = false;
+
+      updateButtons();
+      updateTimeUI();
+      if (!rafId) tick();
+    }
+
+    async function play() {
+      if (!isLoaded) return;
+      const ctx = ensureAudioCtx();
+      try { await ctx.resume(); } catch(e){}
+
+      // connect each time to ensure audio starts
+      try { stNode.disconnect(); } catch(e){}
+      stNode.connect(ctx.destination);
+
+      isPlaying = true;
+      updateButtons();
+    }
+
+    async function pause() {
+      if (!isLoaded) return;
+      if (!audioCtx) return;
+      try { await audioCtx.suspend(); } catch(e){}
+      isPlaying = false;
+      updateButtons();
+    }
+
+    async function stop() {
+      if (!isLoaded) return;
+      await pause();
+      seekTo(0);
+      isPlaying = false;
+      updateButtons();
+    }
+
+    function applyKeyChange() {
+      const semi = Number(key.value);
+      keyValue.textContent = `${semi}（±${Math.abs(semi)}）`;
+
+      if (!isLoaded || !soundTouch) return;
+
+      // Rebuild pitch processor with same position, keep tempo=1
+      const t = currentTimeSec();
+
+      const wasPlaying = isPlaying;
+      // stop audio output
+      try { if (stNode) stNode.disconnect(); } catch(e){}
+      try { if (audioCtx) audioCtx.suspend(); } catch(e){}
+
+      // rebuild engine
+      buildEngineFromBuffer();
+      seekTo(t);
+
+      // resume if needed
+      if (wasPlaying) {
+        // connect + resume
+        stNode.connect(audioCtx.destination);
+        audioCtx.resume().catch(()=>{});
+        isPlaying = true;
+      } else {
+        isPlaying = false;
+      }
+      updateButtons();
+    }
+
+    // ---- UI events ----
     loadBtn.addEventListener('click', loadSelectedFile);
 
-    fileInput.addEventListener('change', () => {
-      // ファイル変更時は「読み込み」を押して確定
-      setButtonsEnabled(false);
-      resetLoop();
+    playBtn.addEventListener('click', play);
+    pauseBtn.addEventListener('click', pause);
+    stopBtn.addEventListener('click', stop);
+
+    key.addEventListener('input', applyKeyChange);
+
+    seek.addEventListener('pointerdown', () => { ignoreSeekInput = true; });
+    seek.addEventListener('pointerup', () => { ignoreSeekInput = false; });
+    seek.addEventListener('input', () => {
+      if (!isLoaded) return;
+      const d = durationSec();
+      const ratio = Number(seek.value) / 1000;
+      seekTo(d * ratio);
       updateTimeUI();
     });
 
-    audio.addEventListener('loadedmetadata', () => {
-      setButtonsEnabled(true);
-      updateTimeUI();
-    });
-
-    audio.addEventListener('loadeddata', () => {
-      // loadedmetadata が来ない環境用
-      setButtonsEnabled(true);
-      updateTimeUI();
-    });
-
-    audio.addEventListener('error', () => {
-      setButtonsEnabled(false);
-      alert('読み込みに失敗しました。別の音源で試してください。');
-    });
-
-    // ---------- speed ----------
-    speed.addEventListener('input', () => {
-      const v = Number(speed.value);
-      audio.playbackRate = v;
-      setPreservePitch();
-      speedValue.textContent = v.toFixed(2) + "x";
-      rateText.textContent = "Rate: " + v.toFixed(2) + "x";
-    });
-
-    // ---------- AB loop ----------
     setABtn.addEventListener('click', () => {
-      if (!isFinite(audio.currentTime)) return;
-      A = audio.currentTime;
-      if (B !== null && B <= A) {
-        // Aを後ろに置いたらBをクリア
-        B = null;
-        loopEnabled = false;
-      }
-      updateLoopUI();
+      if (!isLoaded) return;
+      A = currentTimeSec();
+      if (B !== null && B <= A) { B = null; }
+      loopStatus.innerText = 'A:' + A.toFixed(1) + (B !== null ? (' / B:' + B.toFixed(1)) : '');
     });
 
     setBBtn.addEventListener('click', () => {
+      if (!isLoaded) return;
       if (A === null) { alert('先にAを設定してください'); return; }
-      if (!isFinite(audio.currentTime)) return;
-
-      const t = audio.currentTime;
-      if (t <= A + 0.05) { // ほぼ同じ/逆転防止
-        alert('BはAより後ろで設定してください');
-        return;
-      }
-      B = t;
-      updateLoopUI();
-    });
-
-    toggleLoopBtn.addEventListener('click', () => {
-      if (A === null || B === null){
-        alert('AとBを両方設定してください');
-        return;
-      }
-      loopEnabled = !loopEnabled;
-      updateLoopUI();
+      B = currentTimeSec();
+      if (B <= A) { alert('BはAより後にしてください'); B = null; return; }
+      loopStatus.innerText = 'A:' + A.toFixed(1) + ' / B:' + B.toFixed(1);
     });
 
     clearLoopBtn.addEventListener('click', () => {
-      resetLoop();
+      A = null; B = null;
+      loopStatus.innerText = '解除';
     });
 
-    // ループ実行（timeupdate は粗いので、少し早めに戻す）
-    audio.addEventListener('timeupdate', () => {
+    function skip(sec) {
+      if (!isLoaded) return;
+      seekTo(currentTimeSec() + sec);
       updateTimeUI();
-
-      if (!loopEnabled) return;
-      if (A === null || B === null) return;
-
-      const cur = audio.currentTime;
-      // Bに到達したらAに戻す
-      if (cur >= B) {
-        audio.currentTime = A;
-        // iOSで止まる事があるので、再生中なら維持
-        if (!audio.paused) {
-          // play() はユーザー操作無しだと拒否され得るが、再生中なら通ることが多い
-          audio.play().catch(()=>{});
-        }
-      }
-    });
-
-    // ---------- skip ----------
-    function skip(sec){
-      if (!isFinite(audio.currentTime)) return;
-      const dur = audio.duration;
-      const next = audio.currentTime + sec;
-
-      if (isFinite(dur)) {
-        audio.currentTime = clamp(next, 0, Math.max(0, dur - 0.01));
-      } else {
-        audio.currentTime = Math.max(0, next);
-      }
     }
-
     back10.addEventListener('click', () => skip(-10));
     fwd10.addEventListener('click', () => skip(10));
-    document.querySelectorAll('button[data-skip]').forEach(b => {
-      b.addEventListener('click', () => skip(Number(b.dataset.skip)));
-    });
 
-    // ---------- reset ----------
-    resetBtn.addEventListener('click', () => {
-      // 速度・ループ・位置を初期化（ファイルは保持）
-      audio.pause();
-      audio.currentTime = 0;
-      speed.value = "1";
-      audio.playbackRate = 1;
-      setPreservePitch();
-      speedValue.textContent = "1.00x";
-      rateText.textContent = "Rate: 1.00x";
-      resetLoop();
-      updateTimeUI();
-    });
-
-    // 初期状態
-    setButtonsEnabled(false);
-    updateLoopUI();
+    // init
+    keyValue.textContent = '0（±0）';
+    updateButtons();
     updateTimeUI();
   </script>
 </body>
