@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Key Player</title>
+<style>
+body{font-family:sans-serif;text-align:center;padding:20px;}
+button{padding:10px 16px;margin:5px;}
+</style>
 </head>
 
 <body>
@@ -14,42 +18,33 @@
 
 <audio id="audio" controls></audio>
 
-<h3>キー</h3>
-<button onclick="pitchDown()">−</button>
-<span id="pitchVal">0</span>
-<button onclick="pitchUp()">＋</button>
-
-<script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+<h3>キー（半音）</h3>
+<button onclick="down()">−</button>
+<span id="val">0</span>
+<button onclick="up()">＋</button>
 
 <script>
-let audio = document.getElementById("audio");
-let ctx = new (window.AudioContext || window.webkitAudioContext)();
+const audio = document.getElementById("audio");
 let pitch = 0;
-let node;
 
 document.getElementById("file").onchange = e=>{
     audio.src = URL.createObjectURL(e.target.files[0]);
 };
 
-audio.onplay = ()=>{
-    ctx.resume();
-
-    const src = ctx.createMediaElementSource(audio);
-
-    const st = new soundtouch.SoundTouch(ctx.sampleRate);
-    st.pitch = Math.pow(2, pitch/12);
-
-    node = soundtouch.getWebAudioNode(ctx, src, st);
-    node.connect(ctx.destination);
-};
-
-function pitchUp(){
-    pitch++;
-    document.getElementById("pitchVal").innerText = pitch;
+function update(){
+    // 半音 → 再生速度変換
+    audio.playbackRate = Math.pow(2, pitch/12);
+    document.getElementById("val").innerText = pitch;
 }
-function pitchDown(){
+
+function up(){
+    pitch++;
+    update();
+}
+
+function down(){
     pitch--;
-    document.getElementById("pitchVal").innerText = pitch;
+    update();
 }
 </script>
 
