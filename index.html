@@ -1,103 +1,416 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Practice Player</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Practice Player</title>
 
-<style>
-body{
-    font-family:sans-serif;
-    text-align:center;
-    padding:20px;
-    background:#f5f6fa;
-}
-.card{
-    background:white;
-    padding:20px;
-    border-radius:12px;
-    box-shadow:0 5px 20px rgba(0,0,0,0.1);
-}
-input[type=range]{width:100%;}
-button{
-    padding:10px 16px;
-    margin:6px;
-    font-size:15px;
-}
-.big{font-size:18px;font-weight:bold;}
-</style>
+  <!-- SoundTouchJS (Pitch/Tempo control) -->
+  <script src="https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.0/dist/soundtouch.min.js"></script>
+
+  <style>
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+      background:#f5f6fa;
+      margin:0;
+      padding:16px;
+      display:flex;
+      justify-content:center;
+    }
+    .card{
+      width:min(720px,100%);
+      background:#fff;
+      border-radius:14px;
+      box-shadow:0 8px 26px rgba(0,0,0,.10);
+      padding:16px;
+      text-align:center;
+    }
+    h2{ margin:6px 0 14px; }
+    .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .btn{
+      padding:10px 14px;
+      font-size:15px;
+      border:1px solid #d7dbe7;
+      background:#fff;
+      border-radius:10px;
+    }
+    .btn.primary{ background:#2f6feb; border-color:#2f6feb; color:#fff; }
+    .btn.danger{ background:#fff5f5; border-color:#ffd3d3; }
+    .section{ margin:16px 0; text-align:left; }
+    .label{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    input[type="range"]{ width:100%; }
+    .mono{ font-variant-numeric:tabular-nums; }
+    .pill{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      background:#eef2ff;
+      font-size:13px;
+    }
+    .small{ font-size:13px; color:#5b6275; }
+  </style>
 </head>
 
 <body>
+  <div class="card">
+    <h2>🎸 練習用プレイヤー</h2>
 
-<div class="card">
+    <div class="row" style="margin-bottom:10px;">
+      <input type="file" id="fileInput" accept="audio/*" />
+    </div>
 
-<h2>🎸 練習用プレイヤー</h2>
+    <div class="row">
+      <button class="btn primary" id="playBtn">▶︎ 再生</button>
+      <button class="btn" id="pauseBtn">⏸ 一時停止</button>
+      <button class="btn danger" id="stopBtn">⏹ 停止</button>
+    </div>
 
-<input type="file" id="fileInput"><br><br>
-<audio id="audio" controls></audio>
+    <div class="section">
+      <div class="label">
+        <div>再生位置</div>
+        <div class="mono"><span id="curTime">0:00</span> / <span id="durTime">0:00</span></div>
+      </div>
+      <input type="range" id="seek" min="0" max="0" step="0.01" value="0" />
+      <div class="row" style="margin-top:8px;">
+        <button class="btn" id="back10">◀ 10秒</button>
+        <button class="btn" id="fwd10">10秒 ▶</button>
+      </div>
+    </div>
 
-<h3>再生速度</h3>
-<input type="range" id="speed" min="0.5" max="1.5" step="0.01" value="1">
-<p class="big" id="speedValue">1.00x</p>
+    <div class="section">
+      <div class="label">
+        <div>速度（テンポ）</div>
+        <div class="pill mono" id="tempoValue">1.00x</div>
+      </div>
+      <input type="range" id="tempo" min="0.5" max="1.5" step="0.01" value="1" />
+      <div class="small">※ キー変更と独立してテンポ調整します</div>
+    </div>
 
-<h3>A-Bループ</h3>
-<button onclick="setA()">A設定</button>
-<button onclick="setB()">B設定</button>
-<button onclick="clearLoop()">解除</button>
-<p id="loopStatus">未設定</p>
+    <div class="section">
+      <div class="label">
+        <div>キー（半音）</div>
+        <div class="pill mono" id="pitchValue">0</div>
+      </div>
+      <input type="range" id="pitch" min="-12" max="12" step="1" value="0" />
+      <div class="small">※ +1 = 半音上、-1 = 半音下</div>
+    </div>
 
-<h3>10秒戻る / 進む</h3>
-<button onclick="skip(-10)">◀ 10秒</button>
-<button onclick="skip(10)">10秒 ▶</button>
+    <div class="section">
+      <div class="label">
+        <div>A-B ループ</div>
+        <div class="pill mono" id="loopStatus">未設定</div>
+      </div>
+      <div class="row">
+        <button class="btn" id="setA">A 設定</button>
+        <button class="btn" id="setB">B 設定</button>
+        <button class="btn danger" id="clearLoop">解除</button>
+      </div>
+    </div>
 
-</div>
+    <div class="small" id="msg"></div>
+  </div>
 
 <script>
-const audio=document.getElementById('audio');
-const fileInput=document.getElementById('fileInput');
-const speed=document.getElementById('speed');
-const speedValue=document.getElementById('speedValue');
-const loopStatus=document.getElementById('loopStatus');
+(() => {
+  const fileInput = document.getElementById('fileInput');
+  const playBtn   = document.getElementById('playBtn');
+  const pauseBtn  = document.getElementById('pauseBtn');
+  const stopBtn   = document.getElementById('stopBtn');
 
-let A=null;
-let B=null;
+  const seek      = document.getElementById('seek');
+  const curTimeEl = document.getElementById('curTime');
+  const durTimeEl = document.getElementById('durTime');
 
-fileInput.addEventListener('change',()=>{
-    audio.src=URL.createObjectURL(fileInput.files[0]);
-});
+  const tempo     = document.getElementById('tempo');
+  const tempoValue= document.getElementById('tempoValue');
 
-speed.addEventListener('input',()=>{
-    audio.playbackRate=speed.value;
-    audio.preservesPitch=true;
-    audio.webkitPreservesPitch=true;
-    speedValue.innerText=parseFloat(speed.value).toFixed(2)+"x";
-});
+  const pitch     = document.getElementById('pitch');
+  const pitchValue= document.getElementById('pitchValue');
 
-function setA(){
-    A=audio.currentTime;
-    loopStatus.innerText="A:"+A.toFixed(1);
-}
-function setB(){
-    B=audio.currentTime;
-    loopStatus.innerText="A:"+A.toFixed(1)+" / B:"+B.toFixed(1);
-}
-function clearLoop(){
-    A=null; B=null;
-    loopStatus.innerText="解除";
-}
-function skip(sec){
-    audio.currentTime+=sec;
-}
+  const back10    = document.getElementById('back10');
+  const fwd10     = document.getElementById('fwd10');
 
-audio.addEventListener("timeupdate",()=>{
-    if(A!==null && B!==null){
-        if(audio.currentTime>=B){
-            audio.currentTime=A;
-        }
+  const setABtn   = document.getElementById('setA');
+  const setBBtn   = document.getElementById('setB');
+  const clearLoop = document.getElementById('clearLoop');
+  const loopStatus= document.getElementById('loopStatus');
+
+  const msg       = document.getElementById('msg');
+
+  let ctx = null;
+  let buffer = null;
+
+  // SoundTouch
+  let st = null;
+  let source = null;
+  let node = null;
+
+  let isPlaying = false;
+  let rafId = null;
+
+  // position control
+  let posSamples = 0;          // current position in input samples
+  let lastCtxTime = 0;         // for approx tracking
+  let durationSec = 0;
+
+  // AB loop seconds (original timeline)
+  let A = null;
+  let B = null;
+
+  function fmt(t){
+    t = Math.max(0, t || 0);
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  function ensureCtx(){
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  function setMessage(text){
+    msg.textContent = text || '';
+  }
+
+  function updatePitchTempo(){
+    if (!st) return;
+    // tempo slider affects tempo (time stretch)
+    st.tempo = parseFloat(tempo.value);
+
+    // pitch slider is semitone shift: ratio = 2^(n/12)
+    const semi = parseInt(pitch.value, 10);
+    st.pitch = Math.pow(2, semi / 12);
+
+    tempoValue.textContent = parseFloat(tempo.value).toFixed(2) + 'x';
+    pitchValue.textContent = (semi >= 0 ? '+' : '') + semi;
+  }
+
+  function stopPlayback(){
+    isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+
+    if (node) {
+      try { node.disconnect(); } catch {}
+      node.onaudioprocess = null;
+      node = null;
     }
-});
-</script>
+    if (source) {
+      try { source.disconnect(); } catch {}
+      source = null;
+    }
+    lastCtxTime = 0;
+    setMessage('');
+  }
 
+  function startPlayback(){
+    if (!buffer) {
+      setMessage('まず音声ファイルを選択してください');
+      return;
+    }
+    ensureCtx();
+
+    // iOS対策：ユーザー操作で resume
+    ctx.resume();
+
+    stopPlayback();
+
+    // Create SoundTouch source
+    st = new soundtouch.SoundTouch(buffer.sampleRate);
+    updatePitchTempo();
+
+    // A/Bの境界があるなら、posSamples を範囲内に寄せる
+    if (A !== null && posSamples < A * buffer.sampleRate) {
+      posSamples = Math.floor(A * buffer.sampleRate);
+    }
+
+    // SimpleBufferSource
+    source = new soundtouch.SimpleFilter(
+      new soundtouch.BufferSource(buffer),
+      st
+    );
+
+    // ScriptProcessor (works widely incl iPhone Safari)
+    const bufferSize = 4096;
+    node = ctx.createScriptProcessor(bufferSize, 2, 2);
+
+    const left = new Float32Array(bufferSize);
+    const right = new Float32Array(bufferSize);
+
+    // Seek support by moving BufferSource position:
+    // BufferSource in soundtouchjs uses internal "position" in samples (stretcher reads from it)
+    source.sourcePosition = posSamples;
+
+    node.onaudioprocess = (e) => {
+      const outL = e.outputBuffer.getChannelData(0);
+      const outR = e.outputBuffer.numberOfChannels > 1 ? e.outputBuffer.getChannelData(1) : outL;
+
+      // Fill with zeros by default
+      outL.fill(0); outR.fill(0);
+
+      const frames = source.extract([left, right], bufferSize);
+
+      // AB loop check: compare on original timeline (posSamples in input samples)
+      // posSamples advances by "frames" in OUTPUT, but input consumed differs due to tempo/pitch.
+      // soundtouchjs exposes source.sourcePosition in INPUT samples, use it.
+      const inputPos = source.sourcePosition || posSamples;
+
+      if (A !== null && B !== null) {
+        const bSamples = B * buffer.sampleRate;
+        if (inputPos >= bSamples) {
+          // jump back to A
+          source.sourcePosition = Math.floor(A * buffer.sampleRate);
+        }
+      }
+
+      if (frames > 0) {
+        outL.set(left.subarray(0, frames));
+        outR.set(right.subarray(0, frames));
+      } else {
+        // ended
+        stopPlayback();
+      }
+    };
+
+    node.connect(ctx.destination);
+    isPlaying = true;
+    lastCtxTime = ctx.currentTime;
+
+    tickUI();
+  }
+
+  function tickUI(){
+    if (!isPlaying || !buffer || !source) return;
+
+    // Current position from sourcePosition (input samples)
+    const inputPos = source.sourcePosition || 0;
+    const t = inputPos / buffer.sampleRate;
+
+    // Seek UI
+    seek.max = durationSec.toFixed(2);
+    seek.value = Math.min(durationSec, t).toFixed(2);
+
+    curTimeEl.textContent = fmt(t);
+    durTimeEl.textContent = fmt(durationSec);
+
+    rafId = requestAnimationFrame(tickUI);
+  }
+
+  function seekTo(sec){
+    if (!buffer) return;
+    sec = Math.max(0, Math.min(durationSec, sec));
+    posSamples = Math.floor(sec * buffer.sampleRate);
+
+    // if playing, update live
+    if (isPlaying && source) {
+      source.sourcePosition = posSamples;
+    } else {
+      // update UI immediately
+      seek.value = sec.toFixed(2);
+      curTimeEl.textContent = fmt(sec);
+    }
+  }
+
+  // ---- UI events ----
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    try {
+      ensureCtx();
+      const ab = await file.arrayBuffer();
+      buffer = await ctx.decodeAudioData(ab);
+      durationSec = buffer.duration;
+
+      // reset
+      posSamples = 0;
+      A = null; B = null;
+      loopStatus.textContent = '未設定';
+
+      seek.max = durationSec.toFixed(2);
+      seek.value = '0';
+      curTimeEl.textContent = '0:00';
+      durTimeEl.textContent = fmt(durationSec);
+
+      setMessage('読み込みOK');
+    } catch (err) {
+      console.error(err);
+      setMessage('読み込みに失敗しました（別の音声で試してみてください）');
+    }
+  });
+
+  playBtn.addEventListener('click', startPlayback);
+  pauseBtn.addEventListener('click', async () => {
+    if (!ctx) return;
+    if (!isPlaying) return;
+
+    // Pause by suspending context
+    await ctx.suspend();
+    isPlaying = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    setMessage('一時停止中');
+  });
+
+  // resume play
+  pauseBtn.addEventListener('dblclick', async () => {
+    if (!ctx || !buffer) return;
+    await ctx.resume();
+    if (node) {
+      isPlaying = true;
+      setMessage('');
+      tickUI();
+    } else {
+      startPlayback();
+    }
+  });
+
+  stopBtn.addEventListener('click', () => {
+    stopPlayback();
+    seekTo(0);
+    setMessage('停止');
+  });
+
+  tempo.addEventListener('input', () => updatePitchTempo());
+  pitch.addEventListener('input', () => updatePitchTempo());
+
+  seek.addEventListener('input', () => {
+    seekTo(parseFloat(seek.value));
+  });
+
+  back10.addEventListener('click', () => {
+    const sec = parseFloat(seek.value || '0') - 10;
+    seekTo(sec);
+  });
+  fwd10.addEventListener('click', () => {
+    const sec = parseFloat(seek.value || '0') + 10;
+    seekTo(sec);
+  });
+
+  setABtn.addEventListener('click', () => {
+    const t = parseFloat(seek.value || '0');
+    A = t;
+    loopStatus.textContent = `A:${A.toFixed(1)}s` + (B!==null ? ` / B:${B.toFixed(1)}s` : '');
+  });
+
+  setBBtn.addEventListener('click', () => {
+    const t = parseFloat(seek.value || '0');
+    B = t;
+    if (A === null) A = 0;
+    if (B < A) [A, B] = [B, A];
+    loopStatus.textContent = `A:${A.toFixed(1)}s / B:${B.toFixed(1)}s`;
+  });
+
+  clearLoop.addEventListener('click', () => {
+    A = null; B = null;
+    loopStatus.textContent = '解除';
+  });
+
+  // 初期表示
+  tempoValue.textContent = '1.00x';
+  pitchValue.textContent = '0';
+})();
+</script>
 </body>
 </html>
+
