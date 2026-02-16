@@ -71,7 +71,7 @@
     let blobUrl = null;
 
     function setPreservePitch() {
-      // ブラウザ差異吸収
+      // ブラウザ差異吸収（効かない環境もあるが害はない）
       audio.preservesPitch = true;
       audio.webkitPreservesPitch = true;
     }
@@ -85,14 +85,15 @@
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       blobUrl = URL.createObjectURL(f);
       audio.src = blobUrl;
-      audio.load();            // これが無いと「先に進まない」系が出やすい
+      audio.load();
       setPreservePitch();
-      // iOSは自動再生がブロックされるのでここでは再生しない
+      // iOS/Safariは自動再生がブロックされるのでここでは再生しない
     }
 
     loadBtn.addEventListener('click', loadSelectedFile);
+
     fileInput.addEventListener('change', () => {
-      // 変えたら状態だけ更新（読み込みボタン方式が安定）
+      // 選び直したらループ解除
       loopStatus.innerText = '未設定';
       A = null; B = null;
     });
@@ -104,10 +105,45 @@
     });
 
     setABtn.addEventListener('click', () => {
+      if (!audio.src) { alert('先に「読み込み」を押してください'); return; }
       A = audio.currentTime;
       loopStatus.innerText = 'A:' + A.toFixed(1);
     });
+
     setBBtn.addEventListener('click', () => {
+      if (!audio.src) { alert('先に「読み込み」を押してください'); return; }
       if (A === null) { alert('先にAを設定してください'); return; }
       B = audio.currentTime;
-      if (B <= A) { ale
+      if (B <= A) {
+        alert('BはAより後に設定してください');
+        B = null;
+        loopStatus.innerText = 'A:' + A.toFixed(1);
+        return;
+      }
+      loopStatus.innerText = 'A:' + A.toFixed(1) + ' / B:' + B.toFixed(1);
+    });
+
+    clearLoopBtn.addEventListener('click', () => {
+      A = null; B = null;
+      loopStatus.innerText = '未設定';
+    });
+
+    function skip(sec) {
+      if (!audio.duration || isNaN(audio.duration)) return;
+      audio.currentTime = Math.min(Math.max(0, audio.currentTime + sec), audio.duration);
+    }
+
+    back10.addEventListener('click', () => skip(-10));
+    fwd10.addEventListener('click', () => skip(10));
+
+    audio.addEventListener('timeupdate', () => {
+      if (A !== null && B !== null && audio.currentTime >= B) {
+        audio.currentTime = A;
+      }
+    });
+
+    // 初期表示
+    speedValue.innerText = Number(speed.value).toFixed(2) + 'x';
+  </script>
+</body>
+</html>
